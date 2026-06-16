@@ -104,7 +104,7 @@ Reznov/
 - XOR string obfuscation
 - Anonymous pipe cho process I/O capture
 - WinHTTP cho HTTPS communication
-- Multipart form-data (file upload thủ công, không dùng libcurl)
+- Multipart form-data
 - HKCU registry persistence
 - Named mutex single instance
 - Telegram Bot API (getUpdates long-polling, sendMessage, sendDocument, getFile)
