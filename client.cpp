@@ -6,6 +6,8 @@
 #include <fstream>
 #include <vector>
 
+// If you see bug: STARTUPINFO, dont worry, it's just a macro expansion issue with Windows headers. The code is correct ^^
+
 #pragma comment(lib, "winhttp.lib")
 
 using json = nlohmann::json;
